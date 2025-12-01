@@ -1,111 +1,166 @@
 package project_starter.model;
 
+import com.google.transit.realtime.GtfsRealtime;
+import org.jxmapviewer.viewer.GeoPosition;
+import project_starter.datas.StopTripMapper;
+import project_starter.datas.TripIdUtils;
+import project_starter.datas.TripUpdateRecord;
+
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.net.URL;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.transit.realtime.GtfsRealtime;
-
-import project_starter.datas.StopTripMapper;
-import project_starter.datas.TripUpdateRecord;
-
+/**
+ * GTFSFetcher aggiornato:
+ * - parsing robusto da raw bytes o da FeedMessage
+ * - nessun log riga-per-riga
+ * - normalizeEpoch gestisce millisecondi vs secondi
+ * - mappe stop_sequence -> stopId tramite StopTripMapper quando necessario
+ */
 public class GTFSFetcher {
-    private static final String VEHICLE_POSITIONS_URL =
-        "https://romamobilita.it/sites/default/files/rome_rtgtfs_vehicle_positions_feed.pb";
 
-    private static final String TRIP_UPDATES_URL =
-        "https://romamobilita.it/sites/default/files/rome_rtgtfs_trip_updates_feed.pb";
-
-    // --- Helpers ---
-    private static String norm(String s) {
-        return s == null ? null : s.trim();
-    }
-
-    private static String normalizeTripId(String id) {
-        if (id == null) return null;
-        // rimuove prefissi tipo "0#" o "1#"
-        return id.replaceAll("^[0#]+", "").trim();
-    }
+    private GTFSFetcher() {}
 
     private static long normalizeEpoch(long raw) {
         if (raw <= 0) return -1;
-        if (raw >= 1_000_000_000_000L) {       // millisecondi
-            return raw / 1_000;
-        } else if (raw >= 10_000_000_000L) {   // decisecondi
-            return raw / 10;
-        } else if (raw >= 1_000_000_000L) {    // secondi
+
+        // Se sembra millisecondi (>= 10^12) converti in secondi
+        if (raw >= 1_000_000_000_000L) {
+            return raw / 1000L;
+        }
+
+        // Se sembra già in secondi (>= 10^9) usalo così com'è
+        if (raw >= 1_000_000_000L) {
             return raw;
-        } else {
-            return -1;
         }
+
+        // valori non plausibili
+        return -1;
     }
 
-    // --- Vehicle positions ---
-    public static List<VehiclePosition> fetchBusPositions() {
-        List<VehiclePosition> positions = new ArrayList<>();
-        try (InputStream inputStream = new URL(VEHICLE_POSITIONS_URL).openStream()) {
-            GtfsRealtime.FeedMessage feed = GtfsRealtime.FeedMessage.parseFrom(inputStream);
-            for (GtfsRealtime.FeedEntity entity : feed.getEntityList()) {
-                if (!entity.hasVehicle()) continue;
-
-                GtfsRealtime.VehiclePosition vehicle = entity.getVehicle();
-                String tripId = normalizeTripId(vehicle.getTrip().getTripId());
-                String vehicleId = norm(vehicle.getVehicle().getId());
-                double lat = vehicle.getPosition().getLatitude();
-                double lon = vehicle.getPosition().getLongitude();
-                int stopSeq = vehicle.hasCurrentStopSequence() ? vehicle.getCurrentStopSequence() : -1;
-
-                positions.add(new VehiclePosition(
-                    tripId, vehicleId,
-                    new org.jxmapviewer.viewer.GeoPosition(lat, lon),
-                    stopSeq
-                ));
-            }
+    /**
+     * Parsea TripUpdates da un array di byte (raw protobuf) e restituisce una lista di TripUpdateRecord.
+     * Questo metodo è utile quando il downloader legge i raw bytes (eventualmente decompressi).
+     */
+    public static List<TripUpdateRecord> parseTripUpdatesFromBytes(byte[] rawBytes, StopTripMapper stopTripMapper, Long feedHeaderTs) {
+        if (rawBytes == null || rawBytes.length == 0) return new ArrayList<>();
+        try (InputStream in = new ByteArrayInputStream(rawBytes)) {
+            GtfsRealtime.FeedMessage feed = GtfsRealtime.FeedMessage.parseFrom(in);
+            return parseTripUpdates(feed, stopTripMapper, feedHeaderTs);
         } catch (Exception e) {
-            e.printStackTrace();
+            // errore di parsing: ritorna lista vuota (log minimo)
+            System.out.println("GTFSFetcher: errore parsing TU feed: " + e.getMessage());
+            return new ArrayList<>();
         }
-        return positions;
     }
 
-    // --- Trip updates ---
-    public static List<TripUpdateRecord> fetchTripUpdates(StopTripMapper stopTripMapper) {
+    /**
+     * Parsea TripUpdates da un FeedMessage già costruito.
+     *
+     * @param feed           FeedMessage GTFS-RT (può essere null)
+     * @param stopTripMapper mapper per risolvere stopId da stop_sequence
+     * @param feedHeaderTs   timestamp dell'header del feed (epoch seconds) usato come riferimento
+     * @return lista di TripUpdateRecord (rawTripId, stopId, arrivalEpochSeconds)
+     */
+    public static List<TripUpdateRecord> parseTripUpdates(GtfsRealtime.FeedMessage feed, StopTripMapper stopTripMapper, Long feedHeaderTs) {
         List<TripUpdateRecord> updates = new ArrayList<>();
-        try (InputStream inputStream = new URL(TRIP_UPDATES_URL).openStream()) {
-            GtfsRealtime.FeedMessage feed = GtfsRealtime.FeedMessage.parseFrom(inputStream);
+        if (feed == null) return updates;
 
+        try {
             for (GtfsRealtime.FeedEntity entity : feed.getEntityList()) {
                 if (!entity.hasTripUpdate()) continue;
 
                 GtfsRealtime.TripUpdate tu = entity.getTripUpdate();
-                String tripId = normalizeTripId(tu.getTrip().getTripId());
+                String rawTripId = tu.hasTrip() ? tu.getTrip().getTripId() : null;
 
                 for (GtfsRealtime.TripUpdate.StopTimeUpdate stu : tu.getStopTimeUpdateList()) {
-                    String stopId = stu.hasStopId() ? norm(stu.getStopId()) : null;
+                    // skip schedule relationships that are not useful
+                    if (stu.hasScheduleRelationship()) {
+                        GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship rel = stu.getScheduleRelationship();
+                        if (rel == GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED
+                                || rel == GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA) {
+                            continue;
+                        }
+                    }
 
-                    // fallback: se stopId non matcha, usa stop_sequence
+                    String stopId = stu.hasStopId() ? stu.getStopId().trim() : null;
+
+                    // se stopId non è noto, prova a mappare tramite stop_sequence
                     if ((stopId == null || !stopTripMapper.isKnownStopId(stopId)) && stu.hasStopSequence()) {
                         int seq = stu.getStopSequence();
-                        String mappedStop = stopTripMapper.getStopIdByTripAndSequence(tripId, seq);
-                        if (mappedStop != null) stopId = mappedStop;
+                        String mappedStop = stopTripMapper.getStopIdByTripAndSequence(rawTripId, seq);
+                        if (mappedStop != null) {
+                            stopId = mappedStop;
+                        }
                     }
 
-                    long raw = -1;
+                    long rawTime = -1;
                     if (stu.hasArrival() && stu.getArrival().hasTime()) {
-                        raw = stu.getArrival().getTime();
+                        rawTime = stu.getArrival().getTime();
                     } else if (stu.hasDeparture() && stu.getDeparture().hasTime()) {
-                        raw = stu.getDeparture().getTime();
+                        rawTime = stu.getDeparture().getTime();
                     }
 
-                    long arrivalEpoch = normalizeEpoch(raw);
+                    long arrivalEpoch = normalizeEpoch(rawTime);
                     if (stopId != null && arrivalEpoch > 0) {
-                        updates.add(new TripUpdateRecord(tripId, stopId, arrivalEpoch));
+                        updates.add(new TripUpdateRecord(rawTripId, stopId, arrivalEpoch));
                     }
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // parsing error: ritorna quello che è stato raccolto finora
+            System.out.println("GTFSFetcher: eccezione durante parseTripUpdates: " + e.getMessage());
         }
         return updates;
+    }
+
+    /**
+     * Parsea VehiclePositions da un FeedMessage GTFS-RT.
+     * Restituisce una lista di VehiclePosition (tripId, vehicleId, GeoPosition, stopSequence).
+     */
+    public static List<project_starter.model.VehiclePosition> parseVehiclePositions(GtfsRealtime.FeedMessage feed) {
+        List<project_starter.model.VehiclePosition> positions = new ArrayList<>();
+        if (feed == null) return positions;
+
+        try {
+            for (GtfsRealtime.FeedEntity entity : feed.getEntityList()) {
+                if (!entity.hasVehicle()) continue;
+
+                GtfsRealtime.VehiclePosition vehicle = entity.getVehicle();
+
+                String tripId = vehicle.hasTrip() ? vehicle.getTrip().getTripId() : null;
+                String vehicleId = vehicle.hasVehicle() ? vehicle.getVehicle().getId() : null;
+
+                double lat = vehicle.hasPosition() ? vehicle.getPosition().getLatitude() : 0.0;
+                double lon = vehicle.hasPosition() ? vehicle.getPosition().getLongitude() : 0.0;
+                int stopSeq = vehicle.hasCurrentStopSequence() ? vehicle.getCurrentStopSequence() : -1;
+
+                // correzione microgradi se necessario
+                if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+                    double latC = lat / 1_000_000.0;
+                    double lonC = lon / 1_000_000.0;
+                    if (Math.abs(latC) <= 90 && Math.abs(lonC) <= 180) {
+                        lat = latC;
+                        lon = lonC;
+                    }
+                }
+
+                if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+                    continue;
+                }
+
+                positions.add(new project_starter.model.VehiclePosition(
+                        tripId,
+                        vehicleId,
+                        new GeoPosition(lat, lon),
+                        stopSeq
+                ));
+            }
+        } catch (Exception e) {
+            System.out.println("GTFSFetcher: eccezione durante parseVehiclePositions: " + e.getMessage());
+        }
+        return positions;
     }
 }

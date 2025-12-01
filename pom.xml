@@ -20,6 +20,12 @@
   <artifactId>gtfs-realtime-bindings</artifactId>
   <version>0.0.8</version>
 </dependency>
+<dependency>
+  <groupId>com.google.protobuf</groupId>
+  <artifactId>protobuf-java</artifactId>
+  <version>3.21.12</version>
+</dependency>
+
 
         <!-- Gson (opzionale, se ti serve per JSON parsing) -->
         <dependency>

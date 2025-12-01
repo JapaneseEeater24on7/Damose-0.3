@@ -28,6 +28,9 @@ import javax.swing.Timer;
  * Pannello flottante stile fumetto, con sfondo scuro,
  * scroll per la lista, pulsante di chiusura con X disegnata,
  * e animazione di fade-in all'apertura.
+ *
+ * Modifica: niente pallino nero fisso; per ogni riga viene mostrato
+ * un pallino colorato (rosso ritardo, verde anticipo/in orario, bianco statico).
  */
 public class FloatingArrivalPanel extends JPanel {
 
@@ -110,7 +113,7 @@ public class FloatingArrivalPanel extends JPanel {
     // Cambia massimo righe visibili (senza scroll)
     public void setPreferredRowsMax(int max) { this.maxRows = Math.max(1, max); }
 
-    /** Icon circolare per bullet (evita problemi di encoding) */
+    /** Icon circolare per bullet colorato */
     private static class DotIcon implements Icon {
         private final int size;
         private final Color color;
@@ -151,19 +154,28 @@ public class FloatingArrivalPanel extends JPanel {
 
     // Aggiornamento contenuto e dimensioni
     public void update(String stopName, List<String> arrivi) {
-        // titolo con wrapping HTML per evitare sovrapposizione al close button
         String safeName = stopName == null ? "" : stopName;
         title.setText("<html><div style='width:180px;'>Arrivi a " + safeName + "</div></html>");
 
         arrivalsList.removeAll();
-        Icon dot = new DotIcon(8, new Color(120, 200, 120));
 
         for (String a : arrivi) {
+            // decide colore del pallino in base al testo
+            Color dotColor = Color.WHITE; // default statico
+            String lower = a.toLowerCase();
+            if (lower.contains("ritardo")) {
+                dotColor = Color.RED;
+            } else if (lower.contains("anticipo") || lower.contains("in orario")) {
+                dotColor = Color.GREEN;
+            } else if (lower.contains("statico")) {
+                dotColor = Color.WHITE;
+            }
+
             JLabel label = new JLabel(a);
             label.setForeground(Color.WHITE);
             label.setFont(new Font("SansSerif", Font.PLAIN, 13));
             label.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-            label.setIcon(dot);
+            label.setIcon(new DotIcon(8, dotColor));
             label.setIconTextGap(8);
             arrivalsList.add(label);
         }
@@ -187,7 +199,7 @@ public class FloatingArrivalPanel extends JPanel {
 
     // Animazione: fade-in del pannello
     public void fadeIn(int durationMs, int steps) {
-        stopFade();         // ferma eventuali animazioni precedenti
+        stopFade();
         alpha = 0f;
         setVisible(true);
 
@@ -232,12 +244,14 @@ public class FloatingArrivalPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
+        // Freccia sotto al pannello (triangolo), bordo nero + riempimento colore content
         int cx = cb.x + cb.width / 2;
         int arrowW = 16;
         int arrowH = 8;
+
         Polygon triangle = new Polygon();
-        triangle.addPoint(cx - arrowW/2, cb.y + cb.height);
-        triangle.addPoint(cx + arrowW/2, cb.y + cb.height);
+        triangle.addPoint(cx - arrowW / 2, cb.y + cb.height);
+        triangle.addPoint(cx + arrowW / 2, cb.y + cb.height);
         triangle.addPoint(cx, cb.y + cb.height + arrowH);
 
         g2.setColor(Color.BLACK);
@@ -245,9 +259,10 @@ public class FloatingArrivalPanel extends JPanel {
 
         Polygon inner = new Polygon();
         int innerInset = 2;
-        inner.addPoint(cx - arrowW/2 + innerInset, cb.y + cb.height);
-        inner.addPoint(cx + arrowW/2 - innerInset, cb.y + cb.height);
+        inner.addPoint(cx - arrowW / 2 + innerInset, cb.y + cb.height);
+        inner.addPoint(cx + arrowW / 2 - innerInset, cb.y + cb.height);
         inner.addPoint(cx, cb.y + cb.height + arrowH - innerInset);
+
         g2.setColor(content.getBackground());
         g2.fill(inner);
 
