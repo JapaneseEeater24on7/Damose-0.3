@@ -1,18 +1,19 @@
 package project_starter.view;
 
-import org.jxmapviewer.JXMapViewer;
-import org.jxmapviewer.viewer.WaypointPainter;
-import project_starter.BusWaypoint;
-import project_starter.StopWaypoint;
-import project_starter.datas.Stops;
-import project_starter.datas.Trips;
-import project_starter.model.VehiclePosition;
-import project_starter.render.BusWaypointRenderer;
-import project_starter.render.StopWaypointRenderer;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.jxmapviewer.JXMapViewer;
+import org.jxmapviewer.viewer.WaypointPainter;
+
+import project_starter.datas.Stops;
+import project_starter.datas.Trips;
+import project_starter.model.BusWaypoint;
+import project_starter.model.StopWaypoint;
+import project_starter.model.VehiclePosition;
+import project_starter.render.BusWaypointRenderer;
+import project_starter.render.StopWaypointRenderer;
 
 /**
  * Classe responsabile dell'aggiornamento degli overlay sulla mappa:

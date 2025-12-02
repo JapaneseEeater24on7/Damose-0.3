@@ -1,4 +1,4 @@
-package project_starter;
+package project_starter.model;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,34 +12,33 @@ import project_starter.datas.Stops;
 import project_starter.datas.StopsLoader;
 import project_starter.datas.Trips;
 import project_starter.datas.TripsLoader;
-import project_starter.model.VehiclePosition;   
 
+/**
+ * Simulatore statico per modalità offline.
+ * Genera posizioni bus fittizie basate sui dati GTFS statici.
+ */
 public class StaticSimulator {
+
+    private StaticSimulator() {}
 
     /**
      * Simula tutti i bus presenti nei file statici GTFS.
-     * Per ogni tripId in trips.txt, associa tutte le fermate da stop_times.txt
-     * e crea un VehiclePosition con la posizione della fermata.
      */
     public static List<VehiclePosition> simulateAllTrips() {
         List<VehiclePosition> buses = new ArrayList<>();
 
-        // Carica i dati statici
         List<Trips> trips = TripsLoader.load("/gtfs_static/trips.txt");
         List<StopTime> stopTimes = StopTimesLoader.load("/gtfs_static/stop_times.txt");
         List<Stops> stops = StopsLoader.load("/gtfs_static/stops.txt");
 
-        // Per ogni trip
         for (Trips trip : trips) {
             String tripId = trip.getTripId();
 
-            // Trova tutte le fermate di quel trip ordinate per sequenza
             List<StopTime> tripStops = stopTimes.stream()
                     .filter(st -> st.getTripId().equals(tripId))
                     .sorted((a, b) -> Integer.compare(a.getStopSequence(), b.getStopSequence()))
                     .collect(Collectors.toList());
 
-            // Per ogni fermata del trip
             for (StopTime st : tripStops) {
                 Stops stop = stops.stream()
                         .filter(s -> s.getStopId().equals(st.getStopId()))
@@ -48,10 +47,9 @@ public class StaticSimulator {
 
                 if (stop != null) {
                     GeoPosition pos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-
                     buses.add(new VehiclePosition(
                             tripId,
-                            "SIM-" + tripId, // id fittizio del bus
+                            "SIM-" + tripId,
                             pos,
                             st.getStopSequence()
                     ));
@@ -62,3 +60,4 @@ public class StaticSimulator {
         return buses;
     }
 }
+

@@ -1,4 +1,5 @@
 package project_starter.render;
+
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.util.HashMap;
@@ -9,7 +10,7 @@ import javax.swing.ImageIcon;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.WaypointRenderer;
 
-import project_starter.BusWaypoint;
+import project_starter.model.BusWaypoint;
 
 public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
 
@@ -46,9 +47,5 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
             (int) (point.getY() - size / 2),
             null
         );
-
-        // --- LABEL se la vuoi ancora ---
-        // String label = wp.getTripId(); 
-        // g.drawString(label, (int) point.getX() + size, (int) point.getY());
     }
 }

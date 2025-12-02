@@ -1,8 +1,11 @@
-package project_starter;
+package project_starter.view;
 
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+/**
+ * DocumentListener semplificato che esegue un callback su ogni modifica.
+ */
 public class SimpleDocumentListener implements DocumentListener {
 
     private final Runnable callback;
@@ -20,3 +23,4 @@ public class SimpleDocumentListener implements DocumentListener {
     @Override
     public void changedUpdate(DocumentEvent e) { callback.run(); }
 }
+

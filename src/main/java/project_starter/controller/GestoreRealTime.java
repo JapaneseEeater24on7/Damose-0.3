@@ -1,13 +1,14 @@
 package project_starter.controller;
 
-import com.google.transit.realtime.GtfsRealtime;
-import project_starter.ConnectionMode;
-
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import com.google.transit.realtime.GtfsRealtime;
+
+import project_starter.model.ConnectionMode;
 
 /**
  * GestoreRealTime: scarica e mantiene l'ultimo snapshot GTFS-RT valido.
@@ -88,10 +89,11 @@ public class GestoreRealTime {
         try {
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(10_000);
-            conn.setReadTimeout(15_000);
-            conn.setRequestProperty("User-Agent", "realtime-bus-tracker/1.0");
-            conn.setRequestProperty("Accept", "*/*");
+            conn.setConnectTimeout(30_000);  // Increased from 10s to 30s
+            conn.setReadTimeout(60_000);     // Increased from 15s to 60s
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) realtime-bus-tracker/1.0");
+            conn.setRequestProperty("Accept", "application/x-protobuf, application/octet-stream, */*");
+            conn.setRequestProperty("Accept-Encoding", "identity");
             conn.setInstanceFollowRedirects(true);
 
             int code = conn.getResponseCode();

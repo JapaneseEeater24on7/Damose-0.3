@@ -1,4 +1,4 @@
-package project_starter;
+package project_starter.model;
 
 import org.jxmapviewer.viewer.DefaultWaypoint;
 import org.jxmapviewer.viewer.GeoPosition;
@@ -6,7 +6,7 @@ import org.jxmapviewer.viewer.GeoPosition;
 import project_starter.datas.Stops;
 
 /**
- * Rappresenta una fermata come waypoint sulla mappa
+ * Waypoint rappresentante una fermata sulla mappa.
  */
 public class StopWaypoint extends DefaultWaypoint {
 
@@ -26,3 +26,4 @@ public class StopWaypoint extends DefaultWaypoint {
         return stop.getStopName() + " (" + stop.getStopId() + ")";
     }
 }
+

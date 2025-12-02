@@ -1,4 +1,5 @@
 package project_starter.render;
+
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.util.HashMap;
@@ -9,7 +10,7 @@ import javax.swing.ImageIcon;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.WaypointRenderer;
 
-import project_starter.StopWaypoint;
+import project_starter.model.StopWaypoint;
 
 public class StopWaypointRenderer implements WaypointRenderer<StopWaypoint> {
 

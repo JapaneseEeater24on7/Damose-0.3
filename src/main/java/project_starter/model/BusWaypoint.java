@@ -1,17 +1,17 @@
-package project_starter;
+package project_starter.model;
 
 import org.jxmapviewer.viewer.DefaultWaypoint;
 
-import project_starter.model.VehiclePosition;  
-
+/**
+ * Waypoint rappresentante un bus sulla mappa.
+ */
 public class BusWaypoint extends DefaultWaypoint {
     private final String tripId;
     private final String tripHeadsign;
     private final String vehicleId;
 
-    // Costruttore che prende direttamente un VehiclePosition
     public BusWaypoint(VehiclePosition vp, String tripHeadsign) {
-        super(vp.getPosition()); // posizione reale del bus
+        super(vp.getPosition());
         this.tripId = vp.getTripId();
         this.vehicleId = vp.getVehicleId();
         this.tripHeadsign = tripHeadsign;
@@ -34,3 +34,4 @@ public class BusWaypoint extends DefaultWaypoint {
         return "Bus " + vehicleId + " su linea " + tripHeadsign + " (" + tripId + ")";
     }
 }
+

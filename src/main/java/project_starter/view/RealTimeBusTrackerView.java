@@ -8,43 +8,42 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
-import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.*;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLayeredPane;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.UIManager;
 
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.GeoPosition;
 
 import project_starter.datas.Stops;
 
+/**
+ * View principale dell'applicazione Rome Bus Tracker.
+ */
 public class RealTimeBusTrackerView {
 
     private JFrame frame;
     private JXMapViewer mapViewer;
     private JButton searchButton;
     private StopSearchPanel sidePanel;
-
     private JPanel overlayPanel;
-
-    private FloatingArrivalPanel floatingPanel; // pannello flottante
-    private GeoPosition floatingAnchorGeo;     // posizione geografica a cui è ancorato il pannello
-
-    private JLabel stopInfoLabel;
-    private JLabel linesInfoLabel;
-
+    private FloatingArrivalPanel floatingPanel;
+    private GeoPosition floatingAnchorGeo;
     private List<Stops> allStopsCache = new ArrayList<>();
 
-    // listener per zoom/center/tileFactory changes
-    private final PropertyChangeListener mapListener = new PropertyChangeListener() {
-        @Override
-        public void propertyChange(PropertyChangeEvent evt) {
-            String name = evt.getPropertyName();
-            if ("zoom".equals(name) || "center".equals(name) || "tileFactory".equals(name)) {
-                updateFloatingPanelPosition();
-            }
+    private final PropertyChangeListener mapListener = evt -> {
+        String name = evt.getPropertyName();
+        if ("zoom".equals(name) || "center".equals(name) || "tileFactory".equals(name)) {
+            updateFloatingPanelPosition();
         }
     };
 
@@ -53,18 +52,9 @@ public class RealTimeBusTrackerView {
     public JList<Stops> getStopList() { return sidePanel.getStopList(); }
     public void clearStopList() { sidePanel.clearStopList(); }
     public void addStopToList(Stops stop) { sidePanel.addStopToList(stop); }
-    public void setStopInfo(Stops stop) {
-        stopInfoLabel.setText("Fermata: " + stop.getStopName() + " (ID: " + stop.getStopId() + ")");
-        linesInfoLabel.setText("");
-    }
-    public void showLinesInfo(String text) { linesInfoLabel.setText(text); }
 
     public void toggleSidePanel() {
         if (sidePanel != null) sidePanel.setVisible(!sidePanel.isVisible());
-    }
-
-    public void toggleSidePanelIfClosed() {
-        if (sidePanel != null && !sidePanel.isVisible()) sidePanel.setVisible(true);
     }
 
     public JButton getSearchButton() { return searchButton; }
@@ -73,7 +63,6 @@ public class RealTimeBusTrackerView {
     public boolean isStopsMode() { return sidePanel.isStopsMode(); }
     public boolean isLinesMode() { return sidePanel.isLinesMode(); }
 
-    // permette al controller di cambiare il numero massimo di righe visibili senza scroll
     public void setFloatingPanelMaxRows(int maxRows) {
         if (floatingPanel != null) {
             floatingPanel.setPreferredRowsMax(maxRows);
@@ -103,7 +92,6 @@ public class RealTimeBusTrackerView {
         mapViewer.setBounds(0, 0, 900, 700);
         layeredPane.add(mapViewer, JLayeredPane.DEFAULT_LAYER);
 
-        // overlayPanel come campo, layout null per posizionamento manuale dei componenti flottanti
         overlayPanel = new JPanel(null);
         overlayPanel.setOpaque(false);
         overlayPanel.setBounds(0, 0, 900, 700);
@@ -131,26 +119,12 @@ public class RealTimeBusTrackerView {
         sidePanel = new StopSearchPanel();
         frame.add(sidePanel, BorderLayout.WEST);
 
-        // inizializza floatingPanel e lo aggiunge all'overlay
         floatingPanel = new FloatingArrivalPanel();
         floatingPanel.setVisible(false);
-        // callback per pulire l'ancoraggio quando l'utente chiude il pannello (no autochiusura)
         floatingPanel.setOnClose(() -> floatingAnchorGeo = null);
         overlayPanel.add(floatingPanel);
 
-        // pannello info fermata + linee
-        JPanel infoPanel = new JPanel();
-        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
-        stopInfoLabel = new JLabel("Seleziona una fermata...");
-        linesInfoLabel = new JLabel("");
-        infoPanel.add(stopInfoLabel);
-        infoPanel.add(linesInfoLabel);
-        frame.add(infoPanel, BorderLayout.SOUTH);
-
-        // aggiungi listener sulla mappa per aggiornare posizione pannello durante zoom/pan
         mapViewer.addPropertyChangeListener(mapListener);
-
-        // imposta un valore di default per righe visibili (puoi cambiarlo dal controller)
         setFloatingPanelMaxRows(10);
 
         frame.setVisible(true);
@@ -209,12 +183,7 @@ public class RealTimeBusTrackerView {
         this.allStopsCache = stops;
     }
 
-    // -------- NUOVI METODI: mostra / nascondi pannello flottante ancorato --------
-
-    /**
-     * Mostra il pannello flottante posizionato rispetto a pos (Point2D) e salva l'ancoraggio geografico.
-     * anchorGeo è la GeoPosition della fermata: serve per ricalcolare la posizione durante zoom/pan.
-     */
+    // -------- FLOATING PANEL --------
     public void showFloatingPanel(String stopName, List<String> arrivi, Point2D pos, GeoPosition anchorGeo) {
         floatingPanel.update(stopName, arrivi);
         this.floatingAnchorGeo = anchorGeo;
@@ -244,21 +213,15 @@ public class RealTimeBusTrackerView {
         floatingPanel.fadeIn(300, 15);
     }
 
-    /**
-     * Overload comodo: se hai solo pos (Point2D) senza GeoPosition, chiama questo.
-     * Se vuoi che il pannello rimanga ancorato durante zoom/pan, passa anche la GeoPosition nel controller.
-     */
     public void showFloatingPanel(String stopName, List<String> arrivi, Point2D pos) {
         showFloatingPanel(stopName, arrivi, pos, null);
     }
 
-    /** Nasconde il pannello e rimuove l'ancoraggio geografico */
     public void hideFloatingPanel() {
         floatingPanel.setVisible(false);
         floatingAnchorGeo = null;
     }
 
-    /** Ricalcola la posizione del pannello in base alla GeoPosition salvata */
     private void updateFloatingPanelPosition() {
         if (!floatingPanel.isVisible() || floatingAnchorGeo == null) return;
 
