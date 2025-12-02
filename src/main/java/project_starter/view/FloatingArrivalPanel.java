@@ -71,6 +71,7 @@ public class FloatingArrivalPanel extends JPanel {
         title = new JLabel("Arrivi");
         title.setForeground(Color.WHITE);
         title.setFont(TITLE_FONT);
+        title.setMaximumSize(new Dimension(PANEL_WIDTH - 60, 30)); // Prevent unbounded expansion
 
         closeButton = new JButton();
         closeButton.setFocusPainted(false);
@@ -151,7 +152,9 @@ public class FloatingArrivalPanel extends JPanel {
     // Aggiornamento contenuto e dimensioni
     public void update(String stopName, List<String> arrivi) {
         String safeName = stopName == null ? "" : stopName;
-        title.setText("Arrivi a " + safeName);
+        // Limit title width to prevent pushing close button off-screen
+        String displayName = safeName.length() > 25 ? safeName.substring(0, 25) + "..." : safeName;
+        title.setText("Arrivi a " + displayName);
 
         arrivalsList.removeAll();
 
